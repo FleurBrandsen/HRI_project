@@ -1,0 +1,82 @@
+#VRML_SIM R2020b utf8
+WorldInfo {
+  info [
+    "Aldebaran's Nao H25 V5.0"
+    "NAO is a programmable, 57-cm tall humanoid robot."
+    "The body has 25 degrees of freedom (DOF)."
+    "The sensors include 2 cameras, 4 microphones, sonar rangefinder, 2 IR emitters and receivers, 1 inertial board, and 8 pressure sensors."
+  ]
+  title "Aldebaran's Nao"
+  basicTimeStep 20
+  FPS 20
+  coordinateSystem "NUE"
+  contactProperties [
+    ContactProperties {
+      material1 "NAO foot material"
+      coulombFriction [
+        7
+      ]
+      bounce 0.3
+      bounceVelocity 0.003
+    }
+  ]
+}
+Viewpoint {
+  orientation 0.5321973403270078 0.7417390192957671 0.4081534248331289 4.737673871485696
+  position -4.3063796375418475 6.972441966225663 2.25314937541285
+  followType "None"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 25 25
+  tileSize 0.8 0.8
+}
+Table {
+  translation 0 0 1.4
+  size 1.7 0.4 1
+}
+Table {
+  translation 0 0 -1.2
+  name "table(1)"
+  size 1.7 0.4 1
+}
+Tiago++ {
+}
+Can {
+  translation -0.390002 0.47 1.1
+  rotation 0 -1 0 -5.307179586466759e-06
+  color 0 0 1
+  textureUrl [
+    "C:/Users/noekn/AppData/Local/Programs/Webots/projects/objects/fruits/protos/textures/orange_occlusion.jpg"
+  ]
+}
+Can {
+  translation 0.409987 0.47 -1.24
+  rotation 0 -1 0 -5.307179586466759e-06
+  name "can(1)"
+  color 0 0 0
+  textureUrl [
+    "C:/Users/noekn/AppData/Local/Programs/Webots/projects/objects/fruits/protos/textures/orange_occlusion.jpg"
+  ]
+}
+Can {
+  translation -0.320013 0.47 -1.1
+  rotation 0 -1 0 -5.307179586466759e-06
+  name "can(2)"
+  color 0 1 0
+  textureUrl [
+    "C:/Users/noekn/AppData/Local/Programs/Webots/projects/objects/fruits/protos/textures/orange_occlusion.jpg"
+  ]
+}
+Can {
+  translation 0.420001 0.47 1.52
+  rotation 0 -1 0 -5.307179586466759e-06
+  name "can(3)"
+  color 1 0 0
+  textureUrl [
+    "C:/Users/noekn/AppData/Local/Programs/Webots/projects/objects/fruits/protos/textures/orange_occlusion.jpg"
+  ]
+}
