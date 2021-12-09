@@ -67,7 +67,88 @@ class MyRobot(Robot):
         #self.rightcamera.disable()
 
         #self.leftcamera.enable(self.timeStep)
-       # self.rightcamera.enable(self.timeStep)
+        #self.rightcamera.enable(self.timeStep)
+        
+        # actuators:
+        self.actuators = {
+            'left_hand_left_finger': {  # Hands
+                'motor': self.getDevice('left_hand_gripper_left_finger_joint'),
+                'sensor': self.getDevice('left_hand_gripper_left_finger_joint_sensor')
+            },   
+            'left_hand_right_finger': {
+                'motor': self.getDevice('left_hand_gripper_right_finger_joint'),
+                'sensor': self.getDevice('left_hand_gripper_right_finger_joint_sensor')
+            },
+            'right_hand_left_finger': {
+                'motor': self.getDevice('right_hand_gripper_left_finger_joint'),
+                'sensor': self.getDevice('right_hand_gripper_left_finger_joint_sensor')
+            },
+            'right_hand_right_finger': {
+                'motor': self.getDevice('right_hand_gripper_right_finger_joint'),
+                'sensor': self.getDevice('right_hand_gripper_right_finger_joint_sensor')
+            },
+            'left_elbow_bend': {  # elbows
+                'motor': None,
+                'sensor': None
+            },         
+            'left_elbow_roll': {
+                'motor': None,
+                'sensor': None
+            },
+            'right_elbow_bend': {
+                'motor': None,
+                'sensor': None
+            },
+            'right_elbow_roll': {
+                'motor': None,
+                'sensor': None
+            },
+            'left_wrist_bend': {  # wrists
+                'motor': None,
+                'sensor': None
+            },         
+            'left_wirst_roll': {
+                'motor': None,
+                'sensor': None
+            },
+            'right_wrist_bend': {
+                'motor': None,
+                'sensor': None
+            },
+            'right_wrist_roll': {
+                'motor': None,
+                'sensor': None
+            },
+            'left_shoulder_yaw': {  # shoulders
+                'motor': None,
+                'sensor': None
+            },       
+            'left_shoulder_pitch': {
+                'motor': None,
+                'sensor': None
+            },
+            'left_shoulder_roll': {
+                'motor': None,
+                'sensor': None
+            },
+            'right_shoulder_yaw': {
+                'motor': None,
+                'sensor': None
+            },
+            'right_shoulder_pitch': {
+                'motor': None,
+                'sensor': None
+            },
+            'right_shoulder_roll': {
+                'motor': None,
+                'sensor': None
+            }
+        }
+        # add extra values to actuator dictionary:
+        for actuator in self.actuators.values():
+            actuator['last_pos'] = 0
+            actuator['moving'] = False
+        
         
 
         
@@ -174,6 +255,44 @@ class MyRobot(Robot):
             if self.step(self.timeStep) == -1:
                 break
                 
+    # Object manipulation:
+                
+    def grab(self, side):
+        self.actuators[side+'_hand_left_finger']['moving'] = True
+        self.actuators[side+'_hand_right_finger']['moving'] = True
+        self.actuators[side+'_hand_left_finger']['motor'].setPosition(0)
+        self.actuators[side+'_hand_right_finger']['motor'].setPosition(0)
+    
+    def release(self, side):
+        self.actuators[side+'_hand_left_finger']['motor'].setPosition(0.05)
+        self.actuators[side+'_hand_right_finger']['motor'].setPosition(0.05)
+       
+    def move_hand_to_coordinate(self, side, coordinate):
+        pass
+        
+    def test_hands(self):    # find way to stop moving fingers when holding object!! preferably without hardcoding..
+        for actuator in self.actuators.values():
+            if actuator['sensor']:
+                actuator['sensor'].enable(5)  # poll sensor every 5 ms
+        self.release('left')
+        self.move_hand_to_coordinate('left', None)
+        #self.grab('left')
+        while self.step(self.timeStep) != -1: 
+            for actuator in self.actuators.values():
+                if actuator['moving']:
+                    pos = actuator['sensor'].getValue()
+                    if pos == actuator['last_pos']:
+                        actuator['motor'].setPosition[pos]
+                #    self.check_stop_condition[actuator]
+                
+            if self.actuators['left_hand_left_finger']['sensor'].getValue() >= 0.045:
+                break
+        self.grab('left')
+        while self.step(self.timeStep) != -1: 
+            pass
+            
+        
 
 robot = MyRobot(ext_camera_flag = False)
-robot.run_keyboard()
+#robot.run_keyboard()
+robot.test_hands()
