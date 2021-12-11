@@ -12,6 +12,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from torch.distributions import constraints, multivariate_normal
 from torch.distributions.distribution import Distribution
+import time
 
 # Turn off warnings
 # warnings.filterwarnings('ignore')
@@ -88,8 +89,8 @@ class MyRobot(Robot):
                 'sensor': self.getDevice('right_hand_gripper_right_finger_joint_sensor')
             },
             'left_elbow_bend': {  # elbows
-                'motor': None,
-                'sensor': None
+                'motor': self.getDevice('arm_left_4_joint'),
+                'sensor': self.getDevice('arm_left_4_joint_sensor')
             },         
             'left_elbow_roll': {
                 'motor': None,
@@ -108,8 +109,8 @@ class MyRobot(Robot):
                 'sensor': None
             },         
             'left_wirst_roll': {
-                'motor': None,
-                'sensor': None
+                'motor': self.getDevice('arm_left_7_joint'),
+                'sensor': self.getDevice('arm_left_7_joint_sensor'),
             },
             'right_wrist_bend': {
                 'motor': None,
@@ -124,8 +125,8 @@ class MyRobot(Robot):
                 'sensor': None
             },       
             'left_shoulder_pitch': {
-                'motor': None,
-                'sensor': None
+                'motor': self.getDevice('arm_left_2_joint'),
+                'sensor': self.getDevice('arm_left_2_joint_sensor')
             },
             'left_shoulder_roll': {
                 'motor': None,
@@ -149,6 +150,7 @@ class MyRobot(Robot):
             actuator['last_pos'] = 0
             actuator['moving'] = False
         
+                
         
 
         
@@ -258,10 +260,31 @@ class MyRobot(Robot):
     # Object manipulation:
                 
     def grab(self, side):
-        self.actuators[side+'_hand_left_finger']['moving'] = True
-        self.actuators[side+'_hand_right_finger']['moving'] = True
+        print('start grab')
         self.actuators[side+'_hand_left_finger']['motor'].setPosition(0)
-        self.actuators[side+'_hand_right_finger']['motor'].setPosition(0)
+        # self.actuators[side+'_hand_right_finger']['motor'].setPosition(0)
+        l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
+        # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
+        self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
+        # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
+        time_steps = 0
+        count_time_steps = False
+        while self.step(self.timeStep) != -1: 
+            if time_steps == 3:
+                break
+            if count_time_steps:
+                time_steps += 1
+            l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
+            # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
+            l_pos_old = self.actuators[side+'_hand_left_finger']['last_pos']
+            # r_pos_old = self.actuators[side+'_hand_right_finger']['last_pos']
+            if  l_pos > l_pos_old: # or r_pos > r_pos_old:
+                self.actuators[side+'_hand_left_finger']['motor'].setPosition(l_pos)
+                # self.actuators[side+'_hand_right_finger']['motor'].setPosition(r_pos)
+                print('done grab')
+                count_time_steps = True
+            self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
+            # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
     
     def release(self, side):
         self.actuators[side+'_hand_left_finger']['motor'].setPosition(0.05)
@@ -270,24 +293,66 @@ class MyRobot(Robot):
     def move_hand_to_coordinate(self, side, coordinate):
         pass
         
+    def rotate_wrist(self, side):
+        self.actuators[side+'_wirst_roll']['motor'].setPosition(-1.6)
+        while self.step(self.timeStep) != -1: 
+            if self.actuators[side+'_wirst_roll']['sensor'].getValue() <= -1.57:
+                break
+        
+        
+        
+        
+    def lower_arm(self, side):
+        print('moving arm')
+        self.actuators['left_elbow_bend']['motor'].setPosition(0.45)      # 55
+        self.actuators['left_shoulder_pitch']['motor'].setPosition(0.55)  # 55
+        while self.step(self.timeStep) != -1:
+            if self.actuators['left_shoulder_pitch']['sensor'].getValue() >= 0.50:  # 50
+                print('stop moving')
+                break
+                
+    def lift_arm(self, side):
+        print('moving arm')
+        self.actuators['left_elbow_bend']['motor'].setPosition(0)
+        self.actuators['left_shoulder_pitch']['motor'].setPosition(0)
+        while self.step(self.timeStep) != -1:
+            if self.actuators['left_elbow_bend']['sensor'].getValue() <= 0:
+                print('stop moving')
+                break
+        
     def test_hands(self):    # find way to stop moving fingers when holding object!! preferably without hardcoding..
         for actuator in self.actuators.values():
             if actuator['sensor']:
-                actuator['sensor'].enable(5)  # poll sensor every 5 ms
+                actuator['sensor'].enable(2)  # poll sensor every 2 ms
         self.release('left')
-        self.move_hand_to_coordinate('left', None)
+        self.rotate_wrist('left')
+        print('rotated wrist')
+        self.lower_arm('left')
+        
+        #self.move_hand_to_coordinate('left', None)
         #self.grab('left')
-        while self.step(self.timeStep) != -1: 
-            for actuator in self.actuators.values():
-                if actuator['moving']:
-                    pos = actuator['sensor'].getValue()
-                    if pos == actuator['last_pos']:
-                        actuator['motor'].setPosition[pos]
-                #    self.check_stop_condition[actuator]
+        #while self.step(self.timeStep) != -1: 
+           # for actuator in self.actuators.values():
+               # if actuator['moving']:
+                   # pos = actuator['sensor'].getValue()
+                   # if abs(pos - actuator['last_pos']) <= 0.01:
+                       # actuator['motor'].setPosition[pos]
+                       # self.actuators['left_hand_left_finger']['motor'].setPosition[self.actuators['left_hand_left_finger']['sensor'].getValue()]
+                       # self.actuators['left_hand_right_finger']['motor'].setPosition[self.actuators['left_hand_right_finger']['sensor'].getValue()]
+                       # self.actuators['left_hand_left_finger']['moving'] = False
+                       # self.actuators['left_hand_right_finger']['moving'] = False
+                  # self.check_stop_condition[actuator]
                 
-            if self.actuators['left_hand_left_finger']['sensor'].getValue() >= 0.045:
-                break
+            # if self.actuators['left_hand_left_finger']['sensor'].getValue() >= 0.045:
+                # break
+                
+        # wait 2 seconds:
+        time.sleep(4)
+                
         self.grab('left')
+        time.sleep(2)
+        print('grabbed')
+        self.lift_arm('left')
         while self.step(self.timeStep) != -1: 
             pass
             
