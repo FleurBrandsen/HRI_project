@@ -22,8 +22,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation -0.20944833156428655 0.9427710126499849 0.2594498296624194 1.927343499948329
-  position 3.598586456260474 2.7019151210993178 -0.9171381036548216
+  orientation -0.20848440333404766 0.8841492447757591 0.41810807996127164 2.3660946988266325
+  position 0.5090862719287533 1.7639751210710388 -1.7859711303109216
   followType "None"
 }
 TexturedBackground {
@@ -44,11 +44,17 @@ Table {
   size 1.7 0.4 1
 }
 Tiago++ {
+  controller "tiago_python_controller"
+  cameraSlot [
+    Camera {
+      width 320
+      height 240
+    }
+  ]
 }
 Solid {
-  translation -0.4 0.44 -1.1
+  translation -0.05 0.44 -1.16
   rotation 0 0.7071067811865475 0.7071067811865475 0
-  scale 0.6 0.6 0.6
   children [
     Shape {
       appearance PBRAppearance {
@@ -57,15 +63,15 @@ Solid {
         metalness 0
       }
       geometry Cylinder {
-        height 0.1
-        radius 0.05
+        height 0.12
+        radius 0.025
       }
     }
   ]
   name "Can red"
   boundingObject Cylinder {
-    height 0.1
-    radius 0.05
+    height 0.12
+    radius 0.025
   }
   physics Physics {
   }
@@ -73,7 +79,6 @@ Solid {
 Solid {
   translation 0.22 0.44 -1.23
   rotation 0 0.7071067811865475 0.7071067811865475 0
-  scale 0.6 0.6 0.6
   children [
     Shape {
       appearance PBRAppearance {
@@ -82,15 +87,15 @@ Solid {
         metalness 0
       }
       geometry Cylinder {
-        height 0.1
-        radius 0.05
+        height 0.12
+        radius 0.025
       }
     }
   ]
   name "Can blue"
   boundingObject Cylinder {
-    height 0.1
-    radius 0.05
+    height 0.12
+    radius 0.025
   }
   physics Physics {
   }
@@ -98,7 +103,6 @@ Solid {
 Solid {
   translation -0.45 0.44 1.38
   rotation 0 0.7071067811865475 0.7071067811865475 0
-  scale 0.6 0.6 0.6
   children [
     Shape {
       appearance PBRAppearance {
@@ -107,15 +111,15 @@ Solid {
         metalness 0
       }
       geometry Cylinder {
-        height 0.1
-        radius 0.05
+        height 0.12
+        radius 0.025
       }
     }
   ]
   name "Can green"
   boundingObject Cylinder {
-    height 0.1
-    radius 0.05
+    height 0.12
+    radius 0.025
   }
   physics Physics {
   }
@@ -123,7 +127,6 @@ Solid {
 Solid {
   translation 0.22 0.44 1.38
   rotation 0 0.7071067811865475 0.7071067811865475 0
-  scale 0.6 0.6 0.6
   children [
     Shape {
       appearance PBRAppearance {
@@ -132,15 +135,15 @@ Solid {
         metalness 0
       }
       geometry Cylinder {
-        height 0.1
-        radius 0.05
+        height 0.12
+        radius 0.025
       }
     }
   ]
   name "Can purple"
   boundingObject Cylinder {
-    height 0.1
-    radius 0.05
+    height 0.12
+    radius 0.025
   }
   physics Physics {
   }

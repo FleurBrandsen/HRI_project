@@ -108,7 +108,7 @@ class MyRobot(Robot):
                 'motor': None,
                 'sensor': None
             },         
-            'left_wirst_roll': {
+            'left_wrist_roll': {
                 'motor': self.getDevice('arm_left_7_joint'),
                 'sensor': self.getDevice('arm_left_7_joint_sensor'),
             },
@@ -287,19 +287,30 @@ class MyRobot(Robot):
             # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
     
     def release(self, side):
-        self.actuators[side+'_hand_left_finger']['motor'].setPosition(0.05)
-        self.actuators[side+'_hand_right_finger']['motor'].setPosition(0.05)
+        self.actuators[side+'_hand_left_finger']['motor'].setPosition(0.045)
+        self.actuators[side+'_hand_right_finger']['motor'].setPosition(0.045)
        
     def move_hand_to_coordinate(self, side, coordinate):
         pass
         
     def rotate_wrist(self, side):
-        self.actuators[side+'_wirst_roll']['motor'].setPosition(-1.6)
+        self.actuators[side+'_wrist_roll']['motor'].setPosition(-1.6)
         while self.step(self.timeStep) != -1: 
-            if self.actuators[side+'_wirst_roll']['sensor'].getValue() <= -1.57:
+            if self.actuators[side+'_wrist_roll']['sensor'].getValue() <= -1.57:
                 break
         
         
+        
+    def pickup_here(self, side):
+        self.lower_arm(side)
+        self.grab(side)
+        print('grabbed')
+        self.lift_arm(side)
+        
+    def putdown_here(self, side):
+        self.lower_arm(side)
+        self.release(side)
+        self.lift_arm(side)
         
         
     def lower_arm(self, side):
@@ -327,7 +338,7 @@ class MyRobot(Robot):
         self.release('left')
         self.rotate_wrist('left')
         print('rotated wrist')
-        self.lower_arm('left')
+        #self.lower_arm('left')
         
         #self.move_hand_to_coordinate('left', None)
         #self.grab('left')
@@ -347,12 +358,15 @@ class MyRobot(Robot):
                 # break
                 
         # wait 2 seconds:
-        time.sleep(4)
+        #time.sleep(4)
                 
-        self.grab('left')
+        #self.grab('left')
+        #time.sleep(2)
+        #print('grabbed')
+        #self.lift_arm('left')
+        self.pickup_here('left')
         time.sleep(2)
-        print('grabbed')
-        self.lift_arm('left')
+        self.putdown_here('left')
         while self.step(self.timeStep) != -1: 
             pass
             
