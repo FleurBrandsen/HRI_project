@@ -27,6 +27,7 @@ Viewpoint {
   followType "None"
 }
 TexturedBackground {
+  skybox FALSE
 }
 TexturedBackgroundLight {
 }
