@@ -25,17 +25,11 @@ class MyRobot(Robot):
         self.timeStep = int(self.getBasicTimeStep()) #32 # Milisecs to process the data (loop frequency) - Use int(self.getBasicTimeStep()) for default
         self.state = 0 # Idle starts for selecting different states
         
-        # Sensors init
-        
-        self.step(self.timeStep) # Execute one step to get the initial position
-        #print("Self.step: ", self.step)
+        # Execute one step to get the initial position
+        self.step(self.timeStep)
+
         self.ext_camera = ext_camera_flag        
-        #self.displayCamExt = self.getDisplay('CameraExt')
-        
-        #external camera
-        #if self.ext_camera:
-        #    self.cameraExt = cv2.VideoCapture(0)
-                
+
         # Keyboard
         self.keyboard.enable(self.timeStep)
         self.keyboard = self.getKeyboard()
@@ -44,58 +38,15 @@ class MyRobot(Robot):
         self.camera = self.getDevice('camera')
         self.camera.enable(self.timeStep)
         print("Camera: ", self.camera)
-        
-        # Left shoulder and elbow of Nao        
-        #self.leftShoulder = self.getMotor('LShoulderPitch')
-        #self.leftShoulderRoll = self.getMotor('LShoulderRoll')
-        #self.leftElbow = self.getMotor('LElbowRoll')
-        #self.head_yaw = self.getDevice(12)
-        
+               
         for i in range(self.getNumberOfDevices()):
             #break
             print(i, self.getDeviceByIndex(i))
-        
-        #Cameras from external source (MultiSenseS21)
-        #self.inertialunit = self.getDeviceByIndex(42)
-        
-        #for i in range(self.getNumberOfDevices()):
-        #    break
-        #    print(i, self.getDeviceByIndex(i))
-        
 
-        # Head motors:
-        #self.head_horizontal = self.getMotor("head_1_joint")
-        #self.head_vertical = self.getMotor("head_2_joint")
-        
-        #self.horizontal_sensor = self.head_horizontal.getPositionSensor()
-        #self.horizontal_sensor.enable(self.timeStep)
-        #self.vertical_sensor = self.head_vertical.getPositionSensor()
-        #self.vertical_sensor.enable(self.timeStep)
-        
-        # Wheel motors
-        #self.left_wheel = self.getMotor("wheel_left_joint")
-        #self.right_wheel = self.getMotor("wheel_right_joint")
-        
-        #self.left_wheel_sensor = self.left_wheel.getPositionSensor()
-        #self.left_wheel_sensor.enable(self.timeStep)
-        #self.right_wheel_sensor = self.right_wheel.getPositionSensor()
-        #self.right_wheel_sensor.enable(self.timeStep)
-        #print(self.inertialunit.SFRotation)
-        
-        #self.leftcamera = self.getDeviceByIndex(43) 
-        #self.rightcamera = self.getDeviceByIndex(44)
-        #print("left: ", self.leftcamera)
-        #print("right:, ", self.rightcamera)
-        
-        #self.leftcamera.disable()
-        #self.rightcamera.disable()
-
-        #self.leftcamera.enable(self.timeStep)
-        #self.rightcamera.enable(self.timeStep)
-        
         # actuators:
         self.actuators = {
-            'head_horizontal':{  # Head
+            # Head
+            'head_horizontal':{  
                 'motor': self.getDevice('head_1_joint'),
                 'sensor': self.getDevice('head_1_joint_sensor')
             },
@@ -111,7 +62,8 @@ class MyRobot(Robot):
                 'motor': self.getDevice('wheel_right_joint'),
                 'sensor': self.getDevice('wheel_right_joint_sensor')
             },
-            'left_hand_left_finger': {  # Hands
+            # hands
+            'left_hand_left_finger': {  
                 'motor': self.getDevice('left_hand_gripper_left_finger_joint'),
                 'sensor': self.getDevice('left_hand_gripper_left_finger_joint_sensor')
             },   
@@ -127,7 +79,8 @@ class MyRobot(Robot):
                 'motor': self.getDevice('right_hand_gripper_right_finger_joint'),
                 'sensor': self.getDevice('right_hand_gripper_right_finger_joint_sensor')
             },
-            'left_shoulder_yaw': {  # shoulders
+            # shoulders
+            'left_shoulder_yaw': { 
                 'motor': self.getDevice('arm_left_1_joint'),
                 'sensor': self.getDevice('arm_left_1_joint_sensor')
             },       
@@ -151,7 +104,8 @@ class MyRobot(Robot):
                 'motor': self.getDevice('arm_right_3_joint'),
                 'sensor': self.getDevice('arm_right_3_joint_sensor')
             },
-            'left_elbow_bend': {  # elbows
+            # elbows
+            'left_elbow_bend': {  
                 'motor': self.getDevice('arm_left_4_joint'),
                 'sensor': self.getDevice('arm_left_4_joint_sensor')
             },         
@@ -167,7 +121,8 @@ class MyRobot(Robot):
                 'motor': self.getDevice('arm_right_5_joint'),
                 'sensor': self.getDevice('arm_right_5_joint_sensor')
             },
-            'left_wrist_bend': {  # wrists
+            # wrists
+            'left_wrist_bend': {  
                 'motor': self.getDevice('arm_left_6_joint'),
                 'sensor': self.getDevice('arm_left_6_joint_sensor'),
             },         
@@ -184,6 +139,7 @@ class MyRobot(Robot):
                 'sensor': self.getDevice('arm_right_7_joint_sensor'),
             }
         }
+
         # add extra values to actuator dictionary and enable sensors:
         for actuator in self.actuators.values():
             actuator['last_pos'] = 0
@@ -208,7 +164,6 @@ class MyRobot(Robot):
         # fold in arms
         self.fold_arm_in('left')
         self.fold_arm_in('right')
-        #self.drive_straight()
             
         # Main loop.
         while True:
@@ -228,7 +183,7 @@ class MyRobot(Robot):
             elif k == Keyboard.RIGHT:
                 self.grab_bottle('red')
 
-            #Rotate head up (W), left (A), down (S), right (D)
+            # Rotate head up (W), left (A), down (S), right (D)
             elif k == ord('A'):
                 # Rotate to the left
                 self.move_joint('head_horizontal', 0.1)
@@ -306,6 +261,8 @@ class MyRobot(Robot):
             ' D for turning the head to the right\n'
         )   
 
+
+# ----------------- TASK RELATED FUNCTIONS -----------------
 
     def grab_bottle(self, colour_name):
         # Look for bottle
@@ -390,7 +347,7 @@ class MyRobot(Robot):
             # get errors:
             dx, dy = self.get_error(pos, 512, 512, 1)
             #print(f'dx: {dx}, dy: {dy}')
-            self.move_head_angles(0, -dy)
+            self.move_head(0, -dy)
             if dx > 0.01:
                 self.move_wheels(3, 0)
             elif dx < 0.01:
@@ -406,33 +363,6 @@ class MyRobot(Robot):
 
                   
             # move the head towards ball:
-            
-
-        # print('start grab')
-        # self.actuators[side+'_hand_left_finger']['motor'].setPosition(0)
-        # # self.actuators[side+'_hand_right_finger']['motor'].setPosition(0)
-        # l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
-        # # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
-        # self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
-        # # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
-        # time_steps = 0
-        # count_time_steps = False
-        # while self.step(self.timeStep) != -1: 
-        #     if time_steps == 3:
-        #         break
-        #     if count_time_steps:
-        #         time_steps += 1
-        #     l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
-        #     # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
-        #     l_pos_old = self.actuators[side+'_hand_left_finger']['last_pos']
-        #     # r_pos_old = self.actuators[side+'_hand_right_finger']['last_pos']
-        #     if  l_pos > l_pos_old: # or r_pos > r_pos_old:
-        #         self.actuators[side+'_hand_left_finger']['motor'].setPosition(l_pos)
-        #         # self.actuators[side+'_hand_right_finger']['motor'].setPosition(r_pos)
-        #         print('done grab')
-        #         count_time_steps = True
-        #     self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
-        #     # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
 
  
     def rotate_to_bottle(self, lower, upper):
@@ -452,50 +382,7 @@ class MyRobot(Robot):
                 return True
             if count_down == 0:
                 print('I did not find the pills you asked for, do you want me to find anything else?')
-                return False
-                
- 
-    # TO DO: verwijderen?   
-    def test_hands(self):    # find way to stop moving fingers when holding object!! preferably without hardcoding..
-        for actuator in self.actuators.values():
-            if actuator['sensor']:
-                actuator['sensor'].enable(2)  # poll sensor every 2 ms
-        self.release('left')
-        self.rotate_wrist('left')
-        print('rotated wrist')
-        #self.lower_arm('left')
-        
-        #self.move_hand_to_coordinate('left', None)
-        #self.grab('left')
-        #while self.step(self.timeStep) != -1: 
-           # for actuator in self.actuators.values():
-               # if actuator['moving']:
-                   # pos = actuator['sensor'].getValue()
-                   # if abs(pos - actuator['last_pos']) <= 0.01:
-                       # actuator['motor'].setPosition[pos]
-                       # self.actuators['left_hand_left_finger']['motor'].setPosition[self.actuators['left_hand_left_finger']['sensor'].getValue()]
-                       # self.actuators['left_hand_right_finger']['motor'].setPosition[self.actuators['left_hand_right_finger']['sensor'].getValue()]
-                       # self.actuators['left_hand_left_finger']['moving'] = False
-                       # self.actuators['left_hand_right_finger']['moving'] = False
-                  # self.check_stop_condition[actuator]
-                
-            # if self.actuators['left_hand_left_finger']['sensor'].getValue() >= 0.045:
-                # break
-                
-        # wait 2 seconds:
-        #time.sleep(4)
-                
-        #self.grab('left')
-        #time.sleep(2)
-        #print('grabbed')
-        #self.lift_arm('left')
-        self.pickup_here('left')
-        time.sleep(2)
-        self.putdown_here('left')
-        while self.step(self.timeStep) != -1: 
-            pass
-                        
-
+                return False                   
 
 
     # ----------------- ROBOT RELATED FUNCTIONS -----------------
@@ -514,7 +401,7 @@ class MyRobot(Robot):
         
 
     # set head angle function
-    def move_head_angles(self, dx, dy):
+    def move_head(self, dx, dy):
         # get current angle:
         pitch = self.actuators['head_vertical']
         yaw =  self.actuators['head_horizontal']
@@ -612,7 +499,8 @@ class MyRobot(Robot):
             self.actuators[actuator]['motor'].setPosition(self.actuators[actuator]['sensor'].getValue())
         self.step(self.timeStep)
         
-        
+      
+    # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)  
     def turn_to_bottle(self, cx, turn_speed = 0.1):
         print(cx)
         if cx >= 250:
@@ -690,6 +578,7 @@ class MyRobot(Robot):
                     continue
             return
 
+
     def fold_arm_out(self, side):
         arm_actuators = [self.actuators[name] for name in [f'{side}_shoulder_pitch', f'{side}_elbow_bend']]
         for actuator in arm_actuators:
@@ -700,8 +589,15 @@ class MyRobot(Robot):
                     continue
             return
         
+        
     def bend_wrist_in(self, side):
-        pass
+        wrist = self.actuators[f'{side}_wrist_bend']
+        angle = -0.4
+        wrist['motor'].setPosition(angle)
+        while self.step(self.timeStep) != -1:
+            if wrist['sensor'].getValue() > 0.95*angle:
+                continue
+            return
 
 
 # ----------------- OTHER FUNCTIONS -----------------
@@ -793,13 +689,6 @@ class MyRobot(Robot):
         else:
             return 0, 0
 
-        
-
-        
-    
-
-
 
 robot = MyRobot(ext_camera_flag = False)
 robot.run_keyboard()
-#robot.test_hands()
