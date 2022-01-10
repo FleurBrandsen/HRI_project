@@ -158,6 +158,9 @@ class MyRobot(Robot):
         'purple': [127, 0, 255],
         }
 
+        # QR decoder:
+        self.qrDecoder = cv2.QRCodeDetector()
+
 
     
     def run_keyboard(self):   # change to dictionary if time allows
@@ -187,7 +190,6 @@ class MyRobot(Robot):
             elif k == ord('A'):
                 # Rotate to the left
                 self.move_joint('head_horizontal', 0.1)
-                
             elif k == ord('D'):
                 # Rotate to the right
                 self.move_joint('head_horizontal', -0.1) 
@@ -265,28 +267,26 @@ class MyRobot(Robot):
 # ----------------- TASK RELATED FUNCTIONS -----------------
 
     def grab_bottle(self, colour_name):
-        # Look for bottle
-        if not self.search_bottle(colour_name):
-            return False
-        
-        arm_side = 'left'
-        # when centered on bottle, stretch out left arm:
-        self.fold_arm_out(arm_side)
-
-        # grab the bottle:
-        self.grab(arm_side, colour_name)
-        
-        # return bottle to human
-
-
-    def search_bottle(self, colour_name):
         print('starting search for pills')
         # convert colour name to HSV value:
         colour = self.choose_colour(colour_name)
         boundary = 40  # colour boundary
         lower = np.array([colour[0] - boundary, colour[1] - boundary, colour[2] - 2*boundary])
         upper = np.array([colour[0] + boundary, colour[1] + boundary, colour[2] + 2*boundary])
+        # Look for bottle
+        arm_side = 'left'
+        if not self.search_bottle(colour_name, arm_side, colour, lower, upper):
+            return False      
+        
 
+        # grab the bottle:
+        self.grab(arm_side)
+        
+        # return bottle to human
+        self.return_to_human(colour_name, arm_side, colour, lower, upper)
+
+
+    def search_bottle(self, colour_name, arm_side, colour, lower, upper):
         # retrieve relevant actuators:
         print('lowering head')
         head_yaw = self.actuators['head_vertical']
@@ -300,12 +300,12 @@ class MyRobot(Robot):
             return False
         
         # if found, start centering procedure in different function:
-        self.center_bottle(colour, colour_name, lower, upper)
+        self.center_bottle(colour, colour_name, lower, upper, arm_side)
 
         return True
 
 
-    def grab(self, side, colour_name):
+    def grab(self, side):
         # rotate wrist to vertical position:
         self.rotate_wrist(side)
         print('rotated wrist')
@@ -315,32 +315,37 @@ class MyRobot(Robot):
         self.open_hand(side)
         print('opened hand')
 
-        # adjust elbow/wrist 
-        self.bend_wrist_in(side)
-        print('bent wrist')
-
         # lower arm:
         self.lower_arm(side)
         print('lowered arm')
         # move to grab bottle
 
+        # move shoulder out
+        self.adjust_joint(f'{side}_shoulder_yaw', -0.2)
+
+        # adjust elbow/wrist 
+        self.bend_wrist_in(side)
+        print('bent wrist')
+
+        # move shoulder in
+        print('here')
+        self.adjust_joint(f'{side}_shoulder_yaw', 0.2)
+        
         # close hand
-
+        self.close_hand(side)
+        
         # lift up arm
-
-        # fold in arm
-
-        return
+        self.lift_arm(side)
 
 
-    def center_bottle(self, colour, colour_name, lower, upper):
-        # event loop:
-
+    def center_bottle(self, colour, colour_name, lower, upper, arm_side):
         yaw = self.actuators['head_horizontal']
         pitch = self.actuators['head_vertical']
 
-        correct_pitch = -0.7
-
+        correct_pitch = -0.74
+        stretch_pitch = -0.5
+        stretched = False
+        # event loop:
         while self.step(self.timeStep) != -1:
             # get ball position in image:
             pos = self.extract_bottle_location(lower, upper)
@@ -348,23 +353,25 @@ class MyRobot(Robot):
             dx, dy = self.get_error(pos, 512, 512, 1)
             #print(f'dx: {dx}, dy: {dy}')
             self.move_head(0, -dy)
-            if dx > 0.01:
+            if dx > -0.03:
                 self.move_wheels(3, 0)
-            elif dx < 0.01:
+            elif dx < -0.03:
                 self.move_wheels(0, 3)
-            elif dx < -0.2 or dx == 0 and dy == 0:
+            elif dx < -0.6 or dx == -0.03 and dy == 0:
                 self.move_wheels(-1, 1)
             else:
                 self.move_wheels(3, 3)
+            
+            if not stretched and abs(pitch['sensor'].getValue() - stretch_pitch) < 0.01:
+                # when centered on bottle, stretch out left arm:
+                self.fold_arm_out(arm_side)
+                stretched = True
 
-            if abs(pitch['sensor'].getValue() - correct_pitch) < 0.05:
+            if abs(pitch['sensor'].getValue() - correct_pitch) < 0.01:
                 self.stop_actuators(['left_wheel', 'right_wheel'])
                 return
 
-                  
-            # move the head towards ball:
 
- 
     def rotate_to_bottle(self, lower, upper):
         print('start rotation')
         count_down = 1000 / self.timeStep * 30    # 30 seconds
@@ -384,6 +391,48 @@ class MyRobot(Robot):
                 print('I did not find the pills you asked for, do you want me to find anything else?')
                 return False                   
 
+
+    def close_hand(self, side):
+        print('start grab')
+        self.actuators[side+'_hand_left_finger']['motor'].setPosition(0)
+        # self.actuators[side+'_hand_right_finger']['motor'].setPosition(0)
+        l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
+        # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
+        self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
+        # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
+        time_steps = 0
+        count_time_steps = False
+        while self.step(self.timeStep) != -1: 
+            if time_steps == 3:
+                break
+            if count_time_steps:
+                time_steps += 1
+            l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
+            # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
+            l_pos_old = self.actuators[side+'_hand_left_finger']['last_pos']
+            # r_pos_old = self.actuators[side+'_hand_right_finger']['last_pos']
+            if  l_pos > l_pos_old: # or r_pos > r_pos_old:
+                self.actuators[side+'_hand_left_finger']['motor'].setPosition(l_pos)
+                # self.actuators[side+'_hand_right_finger']['motor'].setPosition(r_pos)
+                print('done grab')
+                count_time_steps = True
+            self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
+            # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
+
+
+    def return_to_human(self, colour_name, arm_side, colour, lower, upper):
+        backup_counter = 1000 / self.timeStep * 6  # back up for 6 seconds
+        while self.step(self.timeStep) != -1:
+            self.move_wheels(-1, -1)
+            backup_counter -= 1
+            if backup_counter == 0:
+                self.stop_actuators(['left_wheel', 'right_wheel'])
+                break
+              
+        self.look_for_QR()
+             
+
+            
 
     # ----------------- ROBOT RELATED FUNCTIONS -----------------
 
@@ -419,7 +468,7 @@ class MyRobot(Robot):
 
     def rotate_wrist(self, side):
         wrist = self.actuators[f'{side}_wrist_roll']
-        angle = -1.57
+        angle = -1.75
         wrist['motor'].setPosition(angle)
         while self.step(self.timeStep) != -1:
             if wrist['sensor'].getValue() > 0.95*angle:
@@ -517,11 +566,23 @@ class MyRobot(Robot):
         sensor = self.actuators[joint]['sensor']
         if(motor.getMaxPosition() > (sensor.getValue() + input) > motor.getMinPosition()):
                     motor.setPosition(float(sensor.getValue() + input))
-                    motor.setVelocity(1)
                     return 0
         else:
             return 1    
-            
+    
+
+    def adjust_joint(self, joint_name, input):
+        joint = self.actuators[joint_name]
+        last_pos = joint['sensor'].getValue()
+        # check for boundaries:
+        goal = max(min((last_pos + input), joint['motor'].getMaxPosition()), joint['motor'].getMinPosition())
+        print(f'Goal is: {goal}, last pos was {last_pos}')
+        joint['motor'].setPosition(goal)
+        
+        while self.step(self.timeStep) != -1:
+            if abs(joint['sensor'].getValue() - goal) < 0.01:
+                return
+
 
     def turn_head(self, joint_name, input, middle = False):
         joint = self.actuators[joint_name]
@@ -592,7 +653,7 @@ class MyRobot(Robot):
         
     def bend_wrist_in(self, side):
         wrist = self.actuators[f'{side}_wrist_bend']
-        angle = -0.4
+        angle = -1.34
         wrist['motor'].setPosition(angle)
         while self.step(self.timeStep) != -1:
             if wrist['sensor'].getValue() > 0.95*angle:
@@ -643,16 +704,17 @@ class MyRobot(Robot):
 
     
     def look_for_QR(self):
+        new_head_position = abs(self.actuators['head_vertical']['sensor'].getValue())
+        self.adjust_joint('head_vertical', new_head_position)
         while self.step(self.timeStep) != -1:
+            self.move_wheels(-1, 1)
             img = self.get_camera_image()
-            data,bbox,rectifiedImage = self.qrDecoder.detectAndDecode(img)
+            data, bbox, rectifiedImage = self.qrDecoder.detectAndDecode(img)
             print(len(data))
-            if len(data) == 0:
-                self.return_to_position(v_position = 0)
-                self.turn_body(1)
-            else:
+            if len(data) != 0:
                 print("Found QR-code. Tiago should try to position itself towards the")
                 print("middle of the code, and then move towards the person.")
+                self.stop_actuators(['left_wheel', 'right_wheel'])
                 break
     
     
