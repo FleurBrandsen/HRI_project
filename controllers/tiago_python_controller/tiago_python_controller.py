@@ -37,11 +37,7 @@ class MyRobot(Robot):
         # Camera
         self.camera = self.getDevice('camera')
         self.camera.enable(self.timeStep)
-        print("Camera: ", self.camera)
-               
-        for i in range(self.getNumberOfDevices()):
-            #break
-            print(i, self.getDeviceByIndex(i))
+        self.camera_size = 1024
 
         # actuators:
         self.actuators = {
@@ -236,8 +232,8 @@ class MyRobot(Robot):
                 self.right_wheel.setVelocity(0)
                 
             elif k == ord("B"):
-                print("looking for QR code")
-                self.look_for_QR()
+                print("Looking for QR code")
+                self.return_to_human('red', 'left')
 
             
             if self.step(self.timeStep) == -1:
@@ -267,7 +263,7 @@ class MyRobot(Robot):
 # ----------------- TASK RELATED FUNCTIONS -----------------
 
     def grab_bottle(self, colour_name):
-        print('starting search for pills')
+        print('Starting the search for pills')
         # convert colour name to HSV value:
         colour = self.choose_colour(colour_name)
         boundary = 40  # colour boundary
@@ -275,20 +271,18 @@ class MyRobot(Robot):
         upper = np.array([colour[0] + boundary, colour[1] + boundary, colour[2] + 2*boundary])
         # Look for bottle
         arm_side = 'left'
-        if not self.search_bottle(colour_name, arm_side, colour, lower, upper):
-            return False      
+        # if not self.search_bottle(colour_name, arm_side, colour, lower, upper):
+        #     return False      
         
-
-        # grab the bottle:
-        self.grab(arm_side)
+        # # grab the bottle:
+        # self.grab(arm_side)
         
         # return bottle to human
-        self.return_to_human(colour_name, arm_side, colour, lower, upper)
+        self.return_to_human(colour_name, arm_side)
 
 
     def search_bottle(self, colour_name, arm_side, colour, lower, upper):
         # retrieve relevant actuators:
-        print('lowering head')
         head_yaw = self.actuators['head_vertical']
         
         # move head down
@@ -308,16 +302,13 @@ class MyRobot(Robot):
     def grab(self, side):
         # rotate wrist to vertical position:
         self.rotate_wrist(side)
-        print('rotated wrist')
         # bend wrist to 90 degrees;
 
         # open hand:
         self.open_hand(side)
-        print('opened hand')
 
         # lower arm:
         self.lower_arm(side)
-        print('lowered arm')
         # move to grab bottle
 
         # move shoulder out
@@ -325,10 +316,8 @@ class MyRobot(Robot):
 
         # adjust elbow/wrist 
         self.bend_wrist_in(side)
-        print('bent wrist')
 
         # move shoulder in
-        print('here')
         self.adjust_joint(f'{side}_shoulder_yaw', 0.2)
         
         # close hand
@@ -350,8 +339,7 @@ class MyRobot(Robot):
             # get ball position in image:
             pos = self.extract_bottle_location(lower, upper)
             # get errors:
-            dx, dy = self.get_error(pos, 512, 512, 1)
-            #print(f'dx: {dx}, dy: {dy}')
+            dx, dy = self.get_error(pos, self.camera_size, self.camera_size, 1)
             self.move_head(0, -dy)
             if dx > -0.03:
                 self.move_wheels(3, 0)
@@ -372,8 +360,31 @@ class MyRobot(Robot):
                 return
 
 
+    def drive_to_target(self, dxdy_func, check_func, dxdy_func_params=None, check_func_params=None):
+        while self.step(self.timeStep) != -1:
+            #if dxdy_func_params != None:
+            #    pos = dxdy_func(dxdy_func_params)
+            #else:
+            pos = dxdy_func(dxdy_func_params)
+
+            dx, dy = self.get_error(pos[0:2], 1)
+            self.move_head(0, -dy)
+            if dx > -0.03:
+                self.move_wheels(3, 0)
+            elif dx < -0.03:
+                self.move_wheels(0, 3)
+            elif dx < -0.6 or dx == -0.03 and dy == 0:
+                self.move_wheels(-1, 1)
+            else:
+                self.move_wheels(3, 3)
+
+            result = check_func(pos)
+            if not result is None:
+                self.stop_actuators(['left_wheel', 'right_wheel'])
+                return result
+            
+
     def rotate_to_bottle(self, lower, upper):
-        print('start rotation')
         count_down = 1000 / self.timeStep * 30    # 30 seconds
         while self.step(self.timeStep) != -1:
             # decrease timer:
@@ -382,7 +393,7 @@ class MyRobot(Robot):
             self.move_wheels(1, -1)
             # extract potential bottle location:
             pos = self.extract_bottle_location(lower, upper)
-            cx, cy = self.get_error(pos, 512, 512, 1)
+            cx, cy = self.get_error(pos, self.camera_size, self.camera_size, 1)
             if cx != 0 and cy != 0 and abs(cx) < 0.4:  # pills were found
                 print('I found the pills!')
                 self.stop_actuators(['left_wheel', 'right_wheel'])
@@ -393,13 +404,11 @@ class MyRobot(Robot):
 
 
     def close_hand(self, side):
-        print('start grab')
-        self.actuators[side+'_hand_left_finger']['motor'].setPosition(0)
-        # self.actuators[side+'_hand_right_finger']['motor'].setPosition(0)
-        l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
-        # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
-        self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
-        # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
+        print('I will now grab the pills')
+        self.adjust_joint(f'{side}_hand_right_finger', -0.003)
+        self.actuators[f'{side}_hand_left_finger']['motor'].setPosition(0)
+        l_pos = self.actuators[f'{side}_hand_left_finger']['sensor'].getValue()
+        self.actuators[f'{side}_hand_left_finger']['last_pos'] = l_pos
         time_steps = 0
         count_time_steps = False
         while self.step(self.timeStep) != -1: 
@@ -407,42 +416,65 @@ class MyRobot(Robot):
                 break
             if count_time_steps:
                 time_steps += 1
-            l_pos = self.actuators[side+'_hand_left_finger']['sensor'].getValue()
-            # r_pos = self.actuators[side+'_hand_right_finger']['sensor'].getValue()
-            l_pos_old = self.actuators[side+'_hand_left_finger']['last_pos']
-            # r_pos_old = self.actuators[side+'_hand_right_finger']['last_pos']
+            l_pos = self.actuators[f'{side}_hand_left_finger']['sensor'].getValue()
+            l_pos_old = self.actuators[f'{side}_hand_left_finger']['last_pos']
             if  l_pos > l_pos_old: # or r_pos > r_pos_old:
-                self.actuators[side+'_hand_left_finger']['motor'].setPosition(l_pos)
-                # self.actuators[side+'_hand_right_finger']['motor'].setPosition(r_pos)
-                print('done grab')
+                self.actuators[f'{side}_hand_left_finger']['motor'].setPosition(l_pos)
+                print('I grabbed your pills')
                 count_time_steps = True
-            self.actuators[side+'_hand_left_finger']['last_pos'] = l_pos
-            # self.actuators[side+'_hand_right_finger']['last_pos'] = r_pos
+            self.actuators[f'{side}_hand_left_finger']['last_pos'] = l_pos
+
+        self.stop_actuators([f'{side}_hand_left_finger', f'{side}_hand_right_finger'])
+        
 
 
-    def return_to_human(self, colour_name, arm_side, colour, lower, upper):
-        backup_counter = 1000 / self.timeStep * 6  # back up for 6 seconds
+    def return_to_human(self, colour_name, arm_side):
+        # backup_counter = 1000 / self.timeStep * 6  # back up for 6 seconds
+        # while self.step(self.timeStep) != -1:
+        #     self.move_wheels(-1, -1)
+        #     backup_counter -= 1
+        #     if backup_counter == 0:
+        #         self.stop_actuators(['left_wheel', 'right_wheel'])
+        #         break
+        found = False
+        while not found:
+            self.look_for_QR()
+            found = self.drive_to_target(self.qr_detector, self.check_qr_distance)
+
+    def drive_to_human(self):
         while self.step(self.timeStep) != -1:
-            self.move_wheels(-1, -1)
-            backup_counter -= 1
-            if backup_counter == 0:
-                self.stop_actuators(['left_wheel', 'right_wheel'])
-                break
-              
-        self.look_for_QR()
-             
+            pos = self.qr_detector()
+            if pos[2] is None:
+                return False
+            self.drive_to_target(self.qr_detector, self.check_qr_distance)
 
+             
+    def check_qr_distance(self, pos):
+        dx = pos[0]
+        dy = pos[1]
+        bbox = pos[2]
+        if bbox is None:
+            return False   # signal we lost the qr code
+        
+        target_size = 0.75*self.camera_size
+        upper_left = bbox[0]
+        bottom_right = bbox[2]
+        if (bottom_right[0] - upper_left[0]) > target_size:
+            return True   # signal that we are close to the human
+        return None    # signal we still have the qr, but we are not close enough
+        
             
 
     # ----------------- ROBOT RELATED FUNCTIONS -----------------
 
+    # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)  
     def pickup_here(self, side):
         self.lower_arm(side)
         self.grab(side)
-        print('grabbed')
         self.lift_arm(side)
         
-
+        
+    # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)
     def putdown_here(self, side):
         self.lower_arm(side)
         self.release(side)
@@ -488,6 +520,7 @@ class MyRobot(Robot):
             return
 
 
+    # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)
     def swing_arm(self, side, angle):
         joint = self.actuators[f'{side}_shoulder_yaw']
         joint['motor'].setPosition(angle)
@@ -507,51 +540,47 @@ class MyRobot(Robot):
                     joint['motor'].setVelocity(0)
                     break
                
-                    
+
+    # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)               
     def drive_straight(self):
-        print('driving')
         left_wheel = self.actuators['left_wheel']
         right_wheel = self.actuators['right_wheel']
         counter = 0
         left_wheel['motor'].setVelocity(1)
         right_wheel['motor'].setVelocity(1)
-        while self.step(self.timeStep) != -1:
-            print('straight')
-            
+        while self.step(self.timeStep) != -1:           
             left_wheel['motor'].setPosition(left_wheel['sensor'].getValue()+1)
             right_wheel['motor'].setPosition(right_wheel['sensor'].getValue()+1)
             
             
     def lower_arm(self, side):
-        print('moving arm')
         self.actuators['left_elbow_bend']['motor'].setPosition(0.45)      # 55
         self.actuators['left_shoulder_pitch']['motor'].setPosition(0.55)  # 55
         while self.step(self.timeStep) != -1:
             if self.actuators['left_shoulder_pitch']['sensor'].getValue() >= 0.50:  # 50
-                print('stop moving')
                 break
                 
 
     def lift_arm(self, side):
-        print('moving arm')
         self.actuators['left_elbow_bend']['motor'].setPosition(0)
         self.actuators['left_shoulder_pitch']['motor'].setPosition(0)
         while self.step(self.timeStep) != -1:
             if self.actuators['left_elbow_bend']['sensor'].getValue() <= 0:
-                print('stop moving')
                 break
 
 
     def stop_actuators(self, actuator_names):
-        print('stopping movement')
         for actuator in actuator_names:
-            self.actuators[actuator]['motor'].setPosition(self.actuators[actuator]['sensor'].getValue())
+            joint = self.actuators[actuator]
+            if actuator in ['left_wheel', 'right_wheel']:
+                joint['motor'].setPosition(joint['sensor'].getValue())
+            else:
+                joint['motor'].setPosition(max(min(joint['sensor'].getValue(), joint['motor'].getMaxPosition()), joint['motor'].getMinPosition()))
         self.step(self.timeStep)
         
       
     # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)  
     def turn_to_bottle(self, cx, turn_speed = 0.1):
-        print(cx)
         if cx >= 250:
             self.turn_body(-1, turn_speed)
         elif cx < 250:
@@ -576,7 +605,6 @@ class MyRobot(Robot):
         last_pos = joint['sensor'].getValue()
         # check for boundaries:
         goal = max(min((last_pos + input), joint['motor'].getMaxPosition()), joint['motor'].getMinPosition())
-        print(f'Goal is: {goal}, last pos was {last_pos}')
         joint['motor'].setPosition(goal)
         
         while self.step(self.timeStep) != -1:
@@ -584,6 +612,7 @@ class MyRobot(Robot):
                 return
 
 
+    # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)
     def turn_head(self, joint_name, input, middle = False):
         joint = self.actuators[joint_name]
         max_pos = joint['motor'].getMaxPosition()
@@ -663,6 +692,7 @@ class MyRobot(Robot):
 
 # ----------------- OTHER FUNCTIONS -----------------
 
+    # TO DO: verwijderen? (wordt niet aangeroepen, dubbel check voor verwijderen!)
     def get_colour_mask(self, lower, upper): 
         #Credits to Niels Cornelissen on Discord
         img = self.get_camera_image()
@@ -684,7 +714,7 @@ class MyRobot(Robot):
         # Convert RGB to HSV:
         # BGR and RGB are switched around for some reason
         colour = cv2.cvtColor(np.uint8([[colour]] ), cv2.COLOR_BGR2HSV)[0][0]
-        print("Colour: ", input)
+        print(f'I will search for {input} pills')
         return colour
 
 
@@ -703,20 +733,31 @@ class MyRobot(Robot):
         return img
 
     
+    def qr_detector(self, *args):
+        img = self.get_camera_image()
+        data, bbox, rectifiedImage = self.qrDecoder.detectAndDecode(img)
+        
+        if bbox is None or len(bbox) == 0:
+            return [-1, -1, None]
+
+        x = (bbox[0][1][0] + bbox[0][0][0]) / 2
+        y = (bbox[0][1][1] + bbox[0][2][1]) / 2
+        return [x, y, bbox[0]]
+
+
     def look_for_QR(self):
-        new_head_position = abs(self.actuators['head_vertical']['sensor'].getValue())
-        self.adjust_joint('head_vertical', new_head_position)
+        head_position = self.actuators['head_vertical']['sensor'].getValue()
+        self.adjust_joint('head_vertical', -head_position)
         while self.step(self.timeStep) != -1:
             self.move_wheels(-1, 1)
-            img = self.get_camera_image()
-            data, bbox, rectifiedImage = self.qrDecoder.detectAndDecode(img)
-            print(len(data))
-            if len(data) != 0:
+            pos = self.qr_detector()
+            if not pos[2] is None:
                 print("Found QR-code. Tiago should try to position itself towards the")
-                print("middle of the code, and then move towards the person.")
+                print("middle of the QR code, and then move towards the person.")
                 self.stop_actuators(['left_wheel', 'right_wheel'])
                 break
-    
+        return 
+                
     
     # bottle locator function
     def extract_bottle_location(self, lower, upper):  
@@ -744,10 +785,10 @@ class MyRobot(Robot):
 
 
     # ball position error function
-    def get_error(self, pos, width, height, K):
+    def get_error(self, pos, K):
         # calculate error between ball pos and image center:
         if pos[0] >= 0:
-            return K*((pos[0]/width)-0.5), K*((pos[1]/height)-0.5)
+            return K*((pos[0]/self.camera_size)-0.5), K*((pos[1]/self.camera_size)-0.5)
         else:
             return 0, 0
 

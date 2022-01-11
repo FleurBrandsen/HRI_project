@@ -22,8 +22,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation 0.25155862451626243 0.9412115953688397 0.22547503448215664 4.525977347632904
-  position -4.76589760890716 3.8340881453651323 -0.5755186150057692
+  orientation 0.05271393064523214 0.9666283866913449 0.25070062536503085 3.310334757455829
+  position -2.55966352477853 5.921583744093114 -8.374738406411424
   followType "None"
   ambientOcclusionRadius 4
 }
@@ -49,7 +49,7 @@ Pedestrian {
           appearance PBRAppearance {
             baseColorMap ImageTexture {
               url [
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Qr-nl-wikipedia-or.svg/1024px-Qr-nl-wikipedia-or.svg.png"
+                "https://nl.qr-code-generator.com/wp-content/themes/qr/new_structure/markets/basic_market/generator/dist/generator/assets/images/websiteQRCode_noFrame.png"
               ]
             }
             roughness 1
@@ -81,8 +81,8 @@ Tiago++ {
   cameraSlot [
     Camera {
       rotation 0 1 0 -1.5707996938995747
-      width 256
-      height 256
+      width 512
+      height 512
     }
   ]
 }
