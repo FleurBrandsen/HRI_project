@@ -5,6 +5,8 @@ import numpy as np
 import math
 import time
 
+from simple_pid import PID
+
 from PIL import Image
 from controller import Robot, Keyboard, Display, Motion, Camera
 
@@ -271,11 +273,11 @@ class MyRobot(Robot):
         upper = np.array([colour[0] + boundary, colour[1] + boundary, colour[2] + 2*boundary])
         # Look for bottle
         arm_side = 'left'
-        # if not self.search_bottle(colour_name, arm_side, colour, lower, upper):
-        #     return False      
+        if not self.search_bottle(colour_name, arm_side, colour, lower, upper):
+            return False      
         
-        # # grab the bottle:
-        # self.grab(arm_side)
+        # grab the bottle:
+        self.grab(arm_side)
         
         # return bottle to human
         self.return_to_human(colour_name, arm_side)
@@ -294,10 +296,17 @@ class MyRobot(Robot):
             return False
         
         # if found, start centering procedure in different function:
-        self.center_bottle(colour, colour_name, lower, upper, arm_side)
-
+        #self.center_bottle(colour, colour_name, lower, upper, arm_side)
+        self.drive_to_target(1.5, self.extract_bottle_location, self.check_head_pitch, dxdy_func_params=(lower, upper), check_func_params=-0.5)
+        self.fold_arm_out(arm_side)
+        self.drive_to_target(1, self.extract_bottle_location, self.check_head_pitch, dxdy_func_params=(lower, upper), check_func_params=-0.74)
         return True
 
+    def check_head_pitch(self, pos, params):
+        target_angle = params
+        if abs(self.actuators['head_vertical']['sensor'].getValue() - target_angle) < 0.01:
+            return True
+        return None
 
     def grab(self, side):
         # rotate wrist to vertical position:
@@ -337,9 +346,9 @@ class MyRobot(Robot):
         # event loop:
         while self.step(self.timeStep) != -1:
             # get ball position in image:
-            pos = self.extract_bottle_location(lower, upper)
+            pos = self.extract_bottle_location((lower, upper))
             # get errors:
-            dx, dy = self.get_error(pos, self.camera_size, self.camera_size, 1)
+            dx, dy = self.get_error(pos, 1)
             self.move_head(0, -dy)
             if dx > -0.03:
                 self.move_wheels(3, 0)
@@ -360,29 +369,44 @@ class MyRobot(Robot):
                 return
 
 
-    def drive_to_target(self, dxdy_func, check_func, dxdy_func_params=None, check_func_params=None):
+    def drive_to_target(self, speed, dxdy_func, check_func, dxdy_func_params=None, check_func_params=None):
+        # init PID controller
+        pid = PID(1, 0.1, 0.5, setpoint=0)
+        # init glitch counter
+        glitch_counter = 0
+        # set large target value for wheels
+        self.move_wheels(100000,100000) 
         while self.step(self.timeStep) != -1:
-            #if dxdy_func_params != None:
-            #    pos = dxdy_func(dxdy_func_params)
-            #else:
+            # retrieve image position of target:
             pos = dxdy_func(dxdy_func_params)
-
-            dx, dy = self.get_error(pos[0:2], 1)
-            self.move_head(0, -dy)
-            if dx > -0.03:
-                self.move_wheels(3, 0)
-            elif dx < -0.03:
-                self.move_wheels(0, 3)
-            elif dx < -0.6 or dx == -0.03 and dy == 0:
-                self.move_wheels(-1, 1)
-            else:
-                self.move_wheels(3, 3)
-
-            result = check_func(pos)
+            # evaluate target
+            result = check_func(pos, check_func_params)
+            # handle evaluation
             if not result is None:
-                self.stop_actuators(['left_wheel', 'right_wheel'])
+                self.set_wheel_speed()
+                if result == False:   # we lost the target. Try again for max of 6 times before trying to find it again
+                    if glitch_counter < 5:
+                        glitch_counter += 1 
+                        continue
+                else:   # we reached our goal
+                    self.stop_actuators(['left_wheel', 'right_wheel'])
                 return result
-            
+            else:       # target was briefly lost
+                glitch_counter = 0
+            # convert target position to error
+            dx, dy = self.get_error(pos[0:2], 1)
+            # adjust head position
+            self.move_head(0, -dy)
+            # adjust wheel speeld:
+            d_speed = min(2*speed, 4*pid(dx))
+            self.set_wheel_speed(l_speed=speed-d_speed, r_speed=speed+d_speed)
+
+
+
+
+    def set_wheel_speed(self, l_speed=1, r_speed=1):
+        self.actuators['left_wheel']['motor'].setVelocity(max(0, l_speed))
+        self.actuators['right_wheel']['motor'].setVelocity(max(0, r_speed))
 
     def rotate_to_bottle(self, lower, upper):
         count_down = 1000 / self.timeStep * 30    # 30 seconds
@@ -392,8 +416,8 @@ class MyRobot(Robot):
             # move wheels
             self.move_wheels(1, -1)
             # extract potential bottle location:
-            pos = self.extract_bottle_location(lower, upper)
-            cx, cy = self.get_error(pos, self.camera_size, self.camera_size, 1)
+            pos = self.extract_bottle_location((lower, upper))
+            cx, cy = self.get_error(pos, 1)
             if cx != 0 and cy != 0 and abs(cx) < 0.4:  # pills were found
                 print('I found the pills!')
                 self.stop_actuators(['left_wheel', 'right_wheel'])
@@ -429,17 +453,20 @@ class MyRobot(Robot):
 
 
     def return_to_human(self, colour_name, arm_side):
-        # backup_counter = 1000 / self.timeStep * 6  # back up for 6 seconds
-        # while self.step(self.timeStep) != -1:
-        #     self.move_wheels(-1, -1)
-        #     backup_counter -= 1
-        #     if backup_counter == 0:
-        #         self.stop_actuators(['left_wheel', 'right_wheel'])
-        #         break
+        backup_counter = 1000 / self.timeStep * 6  # back up for 6 seconds
+        while self.step(self.timeStep) != -1:
+            self.move_wheels(-1, -1)
+            backup_counter -= 1
+            if backup_counter == 0:
+                self.stop_actuators(['left_wheel', 'right_wheel'])
+                break
         found = False
         while not found:
             self.look_for_QR()
-            found = self.drive_to_target(self.qr_detector, self.check_qr_distance)
+            self.drive_to_target(1, self.qr_detector, self.check_qr_distance, check_func_params=0.3)
+            found = self.drive_to_target(2, self.qr_detector, self.check_qr_distance, check_func_params=0.45)
+        # robot is at the human, ready to give the pills
+        self.give_to_human(colour_name, arm_side)
 
     def drive_to_human(self):
         while self.step(self.timeStep) != -1:
@@ -449,20 +476,24 @@ class MyRobot(Robot):
             self.drive_to_target(self.qr_detector, self.check_qr_distance)
 
              
-    def check_qr_distance(self, pos):
+    def check_qr_distance(self, pos, target):
         dx = pos[0]
         dy = pos[1]
         bbox = pos[2]
         if bbox is None:
             return False   # signal we lost the qr code
         
-        target_size = 0.75*self.camera_size
+        target_size = target*self.camera_size
         upper_left = bbox[0]
         bottom_right = bbox[2]
         if (bottom_right[0] - upper_left[0]) > target_size:
+            print('found you')
             return True   # signal that we are close to the human
         return None    # signal we still have the qr, but we are not close enough
-        
+
+    def give_to_human(self, colour_name, arm_side):
+        self.bend_wrist_out(arm_side)
+        print(f'Here are the {colour_name} pills!')
             
 
     # ----------------- ROBOT RELATED FUNCTIONS -----------------
@@ -689,6 +720,14 @@ class MyRobot(Robot):
                 continue
             return
 
+    def bend_wrist_out(self, side):
+        wrist = self.actuators[f'{side}_wrist_bend']
+        angle = 0
+        wrist['motor'].setPosition(angle)
+        while self.step(self.timeStep) != -1:
+            if abs(wrist['sensor'].getValue() - angle) < 0.01:
+                return
+
 
 # ----------------- OTHER FUNCTIONS -----------------
 
@@ -736,8 +775,7 @@ class MyRobot(Robot):
     def qr_detector(self, *args):
         img = self.get_camera_image()
         data, bbox, rectifiedImage = self.qrDecoder.detectAndDecode(img)
-        
-        if bbox is None or len(bbox) == 0:
+        if bbox is None or len(bbox) == 0 or data != 'Hello :)':
             return [-1, -1, None]
 
         x = (bbox[0][1][0] + bbox[0][0][0]) / 2
@@ -760,7 +798,9 @@ class MyRobot(Robot):
                 
     
     # bottle locator function
-    def extract_bottle_location(self, lower, upper):  
+    def extract_bottle_location(self, bounds):  
+        lower = bounds[0]
+        upper = bounds[1]
         # convert image to numpy array:
         img = self.get_camera_image()
         
