@@ -589,35 +589,7 @@ class MyRobot(Robot):
 
         # stop moving fingers
         self.stop_actuators([f'{side}_hand_left_finger', f'{side}_hand_right_finger'])
-        
-    # check for successful pickup
-    def check_failed_pickup(self, side):
-        r_finger = self.actuators[f'{side}_hand_right_finger']
-        l_finger = self.actuators[f'{side}_hand_left_finger']
-        # extract positions
-        r_pos = r_finger['sensor'].getValue()
-        l_pos = l_finger['sensor'].getValue()
-        r_finger['motor'].setPosition(r_pos - 0.01)
-        for i in range(10):
-            self.step(self.timeStep)
-        # extract new positions
-        r_new_pos = r_finger['sensor'].getValue()
-        l_new_pos = l_finger['sensor'].getValue()
-        # stop movement
-        r_finger['motor'].setPosition(r_new_pos)
-        for i in range(3):
-            self.step(self.timeStep)
-        # check for movement
-        if abs(r_new_pos - r_pos) > 0.005 and abs(l_pos - l_new_pos) < 0.00001:
-            print('Tiago: Oh no, I dropped the pills. I\'m so clumsy!')
-            return False
-        else:
-            print('Tiago: I grabbed your pills')
-            return True
-        
-
-        
-
+               
 
     # rotate body to input side (clockwise or counter clockwise), with certain turning speed
     def turn_body(self, input, turn_speed = 0.1):
@@ -695,6 +667,32 @@ class MyRobot(Robot):
     def change_actuator_speed(self, actuator_names, new_speed):
         for name in actuator_names:
             self.actuators[name]['motor'].setVelocity(new_speed)
+
+
+    # check for successful pickup
+    def check_failed_pickup(self, side):
+        r_finger = self.actuators[f'{side}_hand_right_finger']
+        l_finger = self.actuators[f'{side}_hand_left_finger']
+        # extract positions
+        r_pos = r_finger['sensor'].getValue()
+        l_pos = l_finger['sensor'].getValue()
+        r_finger['motor'].setPosition(r_pos - 0.01)
+        for i in range(10):
+            self.step(self.timeStep)
+        # extract new positions
+        r_new_pos = r_finger['sensor'].getValue()
+        l_new_pos = l_finger['sensor'].getValue()
+        # stop movement
+        r_finger['motor'].setPosition(r_new_pos)
+        for i in range(3):
+            self.step(self.timeStep)
+        # check for movement
+        if abs(r_new_pos - r_pos) > 0.005 and abs(l_pos - l_new_pos) < 0.00001:
+            print('Tiago: Oh no, I dropped the pills. I\'m so clumsy!')
+            return False
+        else:
+            print('Tiago: I grabbed your pills')
+            return True
                
 
 # ----------------- OTHER FUNCTIONS -----------------   
