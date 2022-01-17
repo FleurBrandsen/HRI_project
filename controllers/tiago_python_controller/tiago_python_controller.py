@@ -566,12 +566,14 @@ class MyRobot(Robot):
 
     # close hand, on the specified side
     def close_hand(self, side):
+        l_finger =  self.actuators[f'{side}_hand_left_finger']
+        min_l_pos = l_finger['motor'].getMinPosition()
         print('Tiago: I will now grab the pills')
         # set positions and adjust
         self.adjust_joint(f'{side}_hand_right_finger', -0.003)
-        self.actuators[f'{side}_hand_left_finger']['motor'].setPosition(0)
-        l_pos = self.actuators[f'{side}_hand_left_finger']['sensor'].getValue()
-        self.actuators[f'{side}_hand_left_finger']['last_pos'] = l_pos
+        l_finger['motor'].setPosition(0)
+        l_pos = l_finger['sensor'].getValue()
+        l_finger['last_pos'] = l_pos
         # close hand until no movement possible because object is grasped
         time_steps = 0
         count_time_steps = False
@@ -580,12 +582,12 @@ class MyRobot(Robot):
                 break
             if count_time_steps:
                 time_steps += 1
-            l_pos = self.actuators[f'{side}_hand_left_finger']['sensor'].getValue()
-            l_pos_old = self.actuators[f'{side}_hand_left_finger']['last_pos']
+            l_pos = l_finger['sensor'].getValue()
+            l_pos_old = l_finger['last_pos']
             if  l_pos > l_pos_old: # no movement possible anymore
-                self.actuators[f'{side}_hand_left_finger']['motor'].setPosition(l_pos)
+                l_finger['motor'].setPosition(max(l_pos, min_l_pos))
                 count_time_steps = True
-            self.actuators[f'{side}_hand_left_finger']['last_pos'] = l_pos
+            l_finger['last_pos'] = l_pos
 
         # stop moving fingers
         self.stop_actuators([f'{side}_hand_left_finger', f'{side}_hand_right_finger'])
@@ -676,7 +678,8 @@ class MyRobot(Robot):
         # extract positions
         r_pos = r_finger['sensor'].getValue()
         l_pos = l_finger['sensor'].getValue()
-        r_finger['motor'].setPosition(r_pos - 0.01)
+        max_r_pos = r_finger['motor'].getMaxPosition()
+        r_finger['motor'].setPosition(min(max_r_pos, r_pos - 0.01))
         for i in range(10):
             self.step(self.timeStep)
         # extract new positions
