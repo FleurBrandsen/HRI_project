@@ -166,6 +166,9 @@ class MyRobot(Robot):
         # fold in arms
         self.fold_arm_in('left')
         self.fold_arm_in('right')
+
+        # print greeting
+        print('Tiago: Tiago at your service! do you want me to find anything for you?')
             
         # main loop
         while True:
@@ -263,7 +266,7 @@ class MyRobot(Robot):
 
     # perform all necessary actions to grab the pill bottle and return it to the humand
     def grab_bottle(self, colour_name):
-        print('Starting the search for pills')
+        print(f'Human: Tiago, can you get me the {colour_name} pills?')
         # convert colour name to HSV value
         colour = self.choose_colour(colour_name)
         boundary = 40  # colour boundary
@@ -276,10 +279,25 @@ class MyRobot(Robot):
             return False      
         
         # grab the bottle
-        self.grab(arm_side)
+        success = self.grab(arm_side)
+
+        # back up for 6 seconds
+        backup_counter = 1000 / self.timeStep * 6  
+        while self.step(self.timeStep) != -1:
+            self.move_wheels(-1, -1)
+            backup_counter -= 1
+            if backup_counter == 0:
+                self.stop_actuators(['left_wheel', 'right_wheel'])
+                break
+        
         
         # return bottle to human
-        self.return_to_human(colour_name, arm_side)
+        if success:
+            self.return_to_human(colour_name, arm_side)
+        else:
+            self.bend_wrist_out(arm_side)
+            print('Tiago: Do you want me to try again, or do you want me to find different pills?')
+            return False
 
 
     # look around and locate the pill bottle of the specified colour (given in lower and upper colour bounds)
@@ -296,9 +314,9 @@ class MyRobot(Robot):
             return False
         
         # if found, start centering procedure in different function
-        self.drive_to_target(1.5, self.extract_bottle_location, self.check_head_pitch, dxdy_func_params=(lower, upper), check_func_params=-0.5)
+        self.drive_to_target(1.2, self.extract_bottle_location, self.check_head_pitch, dxdy_func_params=(lower, upper), check_func_params=-0.5)
         self.fold_arm_out(arm_side)
-        self.drive_to_target(1, self.extract_bottle_location, self.check_head_pitch, dxdy_func_params=(lower, upper), check_func_params=-0.74)
+        self.drive_to_target(0.8, self.extract_bottle_location, self.check_head_pitch, dxdy_func_params=(lower, upper), check_func_params=-0.74)
         return True
 
 
@@ -329,16 +347,12 @@ class MyRobot(Robot):
         # lift up arm
         self.lift_arm(side)
 
+        # check if pickup was successful
+        return self.check_failed_pickup(side)
+
 
     # drive to human and give pill bottle
     def return_to_human(self, colour_name, arm_side):
-        backup_counter = 1000 / self.timeStep * 6  # back up for 6 seconds
-        while self.step(self.timeStep) != -1:
-            self.move_wheels(-1, -1)
-            backup_counter -= 1
-            if backup_counter == 0:
-                self.stop_actuators(['left_wheel', 'right_wheel'])
-                break
         
         # turn around until QR code is found, then drive to human
         found = False
@@ -363,11 +377,11 @@ class MyRobot(Robot):
             pos = self.extract_bottle_location((lower, upper))
             cx, cy = self.get_error(pos, 1)
             if cx != 0 and cy != 0 and abs(cx) < 0.4:  # pills were found
-                print('I found the pills!')
+                print('Tiago: I found the pills!')
                 self.stop_actuators(['left_wheel', 'right_wheel'])
                 return True
             if count_down == 0:
-                print('I did not find the pills you asked for, do you want me to find anything else?')
+                print('Tiago: I did not find the pills you asked for, do you want me to find anything else?')
                 return False                        
 
 
@@ -408,7 +422,7 @@ class MyRobot(Robot):
     # bend wrist to offer the pills to the human
     def give_to_human(self, colour_name, arm_side):
         self.bend_wrist_out(arm_side)
-        print(f'Here are the {colour_name} pills!')
+        print(f'Tiago: Here are the {colour_name} pills!')
             
 
 
@@ -452,12 +466,14 @@ class MyRobot(Robot):
 
     # lower arm down, on the specified side
     def lower_arm(self, side):
+        # lower joint speeds for better precision
+        self.change_actuator_speed([f'{side}_elbow_bend', f'{side}_shoulder_pitch'], 0.6)
         # set positions
         self.actuators[f'{side}_elbow_bend']['motor'].setPosition(0.45)
         self.actuators[f'{side}_shoulder_pitch']['motor'].setPosition(0.55)
         # move until positions are reached
         while self.step(self.timeStep) != -1:
-            if self.actuators['left_shoulder_pitch']['sensor'].getValue() >= 0.50: 
+            if self.actuators[f'{side}_shoulder_pitch']['sensor'].getValue() >= 0.50: 
                 break
                 
 
@@ -550,7 +566,7 @@ class MyRobot(Robot):
 
     # close hand, on the specified side
     def close_hand(self, side):
-        print('I will now grab the pills')
+        print('Tiago: I will now grab the pills')
         # set positions and adjust
         self.adjust_joint(f'{side}_hand_right_finger', -0.003)
         self.actuators[f'{side}_hand_left_finger']['motor'].setPosition(0)
@@ -560,7 +576,7 @@ class MyRobot(Robot):
         time_steps = 0
         count_time_steps = False
         while self.step(self.timeStep) != -1: 
-            if time_steps == 3:
+            if time_steps == 5:  # 5
                 break
             if count_time_steps:
                 time_steps += 1
@@ -568,12 +584,39 @@ class MyRobot(Robot):
             l_pos_old = self.actuators[f'{side}_hand_left_finger']['last_pos']
             if  l_pos > l_pos_old: # no movement possible anymore
                 self.actuators[f'{side}_hand_left_finger']['motor'].setPosition(l_pos)
-                print('I grabbed your pills')
                 count_time_steps = True
             self.actuators[f'{side}_hand_left_finger']['last_pos'] = l_pos
 
         # stop moving fingers
         self.stop_actuators([f'{side}_hand_left_finger', f'{side}_hand_right_finger'])
+        
+    # check for successful pickup
+    def check_failed_pickup(self, side):
+        r_finger = self.actuators[f'{side}_hand_right_finger']
+        l_finger = self.actuators[f'{side}_hand_left_finger']
+        # extract positions
+        r_pos = r_finger['sensor'].getValue()
+        l_pos = l_finger['sensor'].getValue()
+        r_finger['motor'].setPosition(r_pos - 0.01)
+        for i in range(10):
+            self.step(self.timeStep)
+        # extract new positions
+        r_new_pos = r_finger['sensor'].getValue()
+        l_new_pos = l_finger['sensor'].getValue()
+        # stop movement
+        r_finger['motor'].setPosition(r_new_pos)
+        for i in range(3):
+            self.step(self.timeStep)
+        # check for movement
+        if abs(r_new_pos - r_pos) > 0.005 and abs(l_pos - l_new_pos) < 0.00001:
+            print('Tiago: Oh no, I dropped the pills. I\'m so clumsy!')
+            return False
+        else:
+            print('Tiago: I grabbed your pills')
+            return True
+        
+
+        
 
 
     # rotate body to input side (clockwise or counter clockwise), with certain turning speed
@@ -647,6 +690,11 @@ class MyRobot(Robot):
             else:
                 joint['motor'].setPosition(max(min(joint['sensor'].getValue(), joint['motor'].getMaxPosition()), joint['motor'].getMinPosition()))
         self.step(self.timeStep)
+
+    # change actuator speed for better precision:
+    def change_actuator_speed(self, actuator_names, new_speed):
+        for name in actuator_names:
+            self.actuators[name]['motor'].setVelocity(new_speed)
                
 
 # ----------------- OTHER FUNCTIONS -----------------   
@@ -701,13 +749,13 @@ class MyRobot(Robot):
         if input in self.pill_colours:
             colour = self.pill_colours[input]
         else:
-            print(f'I do not know the colour {input}, can you teach me?')
+            print(f'Tiago: I do not know the colour {input}, can you teach me?')
             return [-1,-1,-1]
             
         # convert RGB to HSV:
         # BGR and RGB are switched around for some reason
         colour = cv2.cvtColor(np.uint8([[colour]] ), cv2.COLOR_BGR2HSV)[0][0]
-        print(f'I will search for {input} pills')
+        print(f'Tiago: I will search for {input} pills now')
         return colour
 
 
@@ -728,8 +776,7 @@ class MyRobot(Robot):
             self.move_wheels(-1, 1)
             pos = self.qr_detector()
             if not pos[2] is None:
-                print("Found QR-code. Tiago should try to position itself towards the")
-                print("middle of the QR code, and then move towards the person.")
+                print("Tiago: I found you! I will bring the pills to you now")
                 self.stop_actuators(['left_wheel', 'right_wheel'])
                 break
         return 
@@ -757,7 +804,6 @@ class MyRobot(Robot):
         upper_left = bbox[0]
         bottom_right = bbox[2]
         if (bottom_right[0] - upper_left[0]) > target_size:
-            print('found you')
             return True   # signal that we are close to the human
         return None    # signal we still have the qr, but we are not close enough
  
